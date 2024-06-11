@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AUTOMUNDOLAVADORAS</title>
+    <style>
+      .grid-fluid{
+        display: grid;
+        grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+      }
+
+      .loader{
+        display: block;
+        margin: auto;
+      }
+      img{
+        max-width: 100%;
+      }
+    </style>
+</head>
+<body>
+  <h1>BIENVENIDOS A MUNDOLAVADORAS</h1>
+  <h2>QUE REPUESTO NECESITAS?</h2>
+  <input type="search" id="search" placeholder="BUSCAR PRODUCTOS....">
+  <section id="productos" class="grid-fluid"></section> 
+  <template id="producto-template">
+    <article class="producto">
+      <h3></h3>
+      <h4></h4>
+      <div></div>
+      <img>
+      <a></a>
+    </article>
+  </template> 
+  
+  <script>
+   
+ 
+
+
+    const d = document,
+    $productos = d.getElementById("productos"),
+    $template = d.getElementById("producto-template").content,
+    $fragment = d.createDocumentFragment();
+
+    d.addEventListener("keypress", async e => {
+  if (e.target.matches("#search")) {
+    if (e.key === "Enter") {
+      try {
+  
+        let query = e.target.value.toLowerCase(); // Convertir la consulta a minúsculas
+        api = `https://mundolavadoras.com/wp-json/wc/v2/products?consumer_key=ck_ac71f77112971d39f3e349dd4a2d0ffbafb21f7a&consumer_secret=cs_fb4fea0b0b698bc83365c2fccb73720003f8da4a&per_page=50`;
+        res = await fetch(api);
+        json = await res.json();
+        console.log(json);
+
+        $productos.innerHTML = ""; // Limpiar el contenido previo
+
+        const productosCoincidentes = json.filter(producto =>
+          producto.name.toLowerCase().includes(query)
+        );
+
+        if (productosCoincidentes.length === 0) {
+          $productos.innerHTML = `<h2>NO EXISTEN PRODUCTOS PARA ESTA BUSQUEDA</h2>`;
+        } else {
+          for (let producto of productosCoincidentes) {
+            $template.querySelector("h3").textContent = producto.price;
+            $template.querySelector("h4").textContent = producto.name;
+
+            $template.querySelector("div").textContent =
+              producto.description || "sin descripción";
+            $template.querySelector("img").src = producto.images[0].src;
+            let $clone = d.importNode($template, true);
+            $fragment.appendChild($clone);
+          }
+          $productos.appendChild($fragment);
+        }
+
+        if (!res.ok) throw { status: res.status, statusText: res.statusText };
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }
+});
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
