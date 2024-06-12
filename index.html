@@ -72,6 +72,8 @@
     <aside class="sidebar" id="cart">
       <h2>Carrito</h2>
       <div id="cart-items"></div>
+      <p id="total-price">Total: $0</p>
+      <button id="checkout-btn">Registrar Compra</button>
     </aside>
   </div>
   <template id="producto-template">
@@ -146,16 +148,22 @@
 
       const renderCartItems = () => {
         $cartItems.innerHTML = "";
+        let totalPrice = 0;
         carrito.forEach(item => {
           $cartItemTemplate.querySelector(".name").textContent = item.name;
           $cartItemTemplate.querySelector(".quantity").textContent = `Cant: ${item.quantity}`;
           $cartItemTemplate.querySelector(".price").textContent = `Precio: ${item.price}`;
           $cartItemTemplate.querySelector(".remove-from-cart").dataset.id = item.id;
 
+          totalPrice += item.price * item.quantity;
+
           let $clone = d.importNode($cartItemTemplate, true);
           $fragment.appendChild($clone);
         });
         $cartItems.appendChild($fragment);
+
+        // Actualizar el precio total
+        d.getElementById("total-price").textContent = `Total: $${totalPrice}`;
 
         // Añadir eventos para los botones de eliminar del carrito
         d.querySelectorAll(".remove-from-cart").forEach(btn => {
@@ -164,10 +172,6 @@
       };
 
       const addToCart = (id) => {
-        // Busca si el producto ya está en el carrito
-        let productoEnCarrito = carrito.find(item => item.id == id);
-        
-        // Encontrar el producto en la lista de productos global.
         let producto = productos.find(item => item.id == id);
 
         if (!producto) {
@@ -175,11 +179,15 @@
           return;
         }
 
+        let productoEnCarrito = carrito.find(item => item.id == id);
+
         if (productoEnCarrito) {
-          // Incrementa la cantidad si ya está en el carrito
-          productoEnCarrito.quantity++;
+          if (productoEnCarrito.quantity < producto.stock_quantity) {
+            productoEnCarrito.quantity++;
+          } else {
+            alert("No puedes agregar más de lo que hay en stock");
+          }
         } else {
-          // Si no está en el carrito, añádelo
           carrito.push({
             id: producto.id,
             name: producto.name,
@@ -201,6 +209,40 @@
         renderCartItems();
       };
 
+      const checkout = async () => {
+        try {
+          let url = 'https://mundolavadoras.com/wp-json/wc/v3/products/batch';
+          let updates = carrito.map(item => ({
+            id: item.id,
+            quantity: {
+              value: item.stock_quantity - item.quantity
+            }
+          }));
+
+          let res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Basic ' + btoa('ck_ac71f77112971d39f3e349dd4a2d0ffbafb21f7a:cs_fb4fea0b0b698bc83365c2fccb73720003f8da4a')
+            },
+            body: JSON.stringify({ update: updates })
+          });
+
+          if (!res.ok) throw { status: res.status, statusText: res.statusText };
+
+          let json = await res.json();
+          console.log(json);
+          
+          // Limpiar carrito después de la compra
+          carrito.length = 0;
+          renderCartItems();
+          alert("Compra realizada con éxito");
+        } catch (err) {
+          console.error(`Error ${err.status}: ${err.statusText}`);
+          alert(`Error ${err.status}: ${err.statusText}`);
+        }
+      };
+
       $search.addEventListener("keypress", async (e) => {
         if (e.key === "Enter") {
           let query = e.target.value.trim().toLowerCase();
@@ -216,6 +258,8 @@
           }
         }
       });
+
+      d.getElementById("checkout-btn").addEventListener("click", checkout);
     });
   </script>
 </body>
