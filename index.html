@@ -5,10 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AUTOMUNDOLAVADORAS</title>
     <style>
+      .container {
+        display: flex;
+      }
+
       .grid-fluid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 1rem;
+        flex: 2;
+      }
+
+      .sidebar {
+        flex: 1;
+        border-left: 1px solid #ccc;
+        padding: 1rem;
+        max-width: 300px;
       }
 
       img {
@@ -22,9 +34,32 @@
         text-align: center;
       }
 
-      .loader {
-        display: block;
-        margin: auto;
+      .cart-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+
+      .cart-item button {
+        background: red;
+        color: white;
+        border: none;
+        padding: 0.5rem;
+      }
+
+      .cart-item .name {
+        flex: 2;
+      }
+
+      .cart-item .quantity {
+        flex: 1;
+        text-align: right;
+      }
+
+      .cart-item .price {
+        flex: 1;
+        text-align: right;
       }
     </style>
 </head>
@@ -32,27 +67,45 @@
   <h1>BIENVENIDOS A MUNDOLAVADORAS</h1>
   <h2>¿QUÉ REPUESTO NECESITAS?</h2>
   <input type="search" id="search" placeholder="BUSCAR PRODUCTOS...">
-  <section id="productos" class="grid-fluid"></section> 
+  <div class="container">
+    <section id="productos" class="grid-fluid"></section> 
+    <aside class="sidebar" id="cart">
+      <h2>Carrito</h2>
+      <div id="cart-items"></div>
+    </aside>
+  </div>
   <template id="producto-template">
     <article class="producto">
       <h3 class="name"></h3>
       <img class="image" alt="Imagen del producto">
       <p class="price"></p>
       <p class="stock"></p>
+      <button class="add-to-cart">Agregar al Carrito</button>
     </article>
-  </template> 
-
+  </template>
+  <template id="cart-item-template">
+    <div class="cart-item">
+      <span class="name"></span>
+      <span class="quantity"></span>
+      <span class="price"></span>
+      <button class="remove-from-cart">x</button>
+    </div>
+  </template>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const d = document,
-            $search = d.getElementById("search"),
-            $productos = d.getElementById("productos"),
-            $template = d.getElementById("producto-template").content,
-            $fragment = d.createDocumentFragment();
+        $search = d.getElementById("search"),
+        $productos = d.getElementById("productos"),
+        $template = d.getElementById("producto-template").content,
+        $cartItems = d.getElementById("cart-items"),
+        $cartItemTemplate = d.getElementById("cart-item-template").content,
+        $fragment = d.createDocumentFragment();
+
+      let productos = [];  // Definimos la variable productos a un nivel global
+      const carrito = [];
 
       const fetchProductos = async (query) => {
         try {
-          // Usa tu URL aquí
           let api = `https://mundolavadoras.com/wp-json/wc/v3/products?search=${encodeURIComponent(query)}&consumer_key=ck_ac71f77112971d39f3e349dd4a2d0ffbafb21f7a&consumer_secret=cs_fb4fea0b0b698bc83365c2fccb73720003f8da4a`;
           let res = await fetch(api);
 
@@ -78,12 +131,74 @@
           $template.querySelector(".price").textContent = `Precio: ${producto.price}`;
           $template.querySelector(".stock").textContent = `Cantidad: ${producto.stock_quantity || 'No disponible'}`;
           $template.querySelector(".image").src = producto.images.length ? producto.images[0].src : '';
-          
+          $template.querySelector(".add-to-cart").dataset.id = producto.id;
           let $clone = d.importNode($template, true);
           $fragment.appendChild($clone);
         });
 
         $productos.appendChild($fragment);
+
+        // Añadir eventos para los botones de añadir al carrito
+        d.querySelectorAll(".add-to-cart").forEach(btn => {
+          btn.addEventListener("click", () => addToCart(btn.dataset.id));
+        });
+      };
+
+      const renderCartItems = () => {
+        $cartItems.innerHTML = "";
+        carrito.forEach(item => {
+          $cartItemTemplate.querySelector(".name").textContent = item.name;
+          $cartItemTemplate.querySelector(".quantity").textContent = `Cant: ${item.quantity}`;
+          $cartItemTemplate.querySelector(".price").textContent = `Precio: ${item.price}`;
+          $cartItemTemplate.querySelector(".remove-from-cart").dataset.id = item.id;
+
+          let $clone = d.importNode($cartItemTemplate, true);
+          $fragment.appendChild($clone);
+        });
+        $cartItems.appendChild($fragment);
+
+        // Añadir eventos para los botones de eliminar del carrito
+        d.querySelectorAll(".remove-from-cart").forEach(btn => {
+          btn.addEventListener("click", () => removeFromCart(btn.dataset.id));
+        });
+      };
+
+      const addToCart = (id) => {
+        // Busca si el producto ya está en el carrito
+        let productoEnCarrito = carrito.find(item => item.id == id);
+        
+        // Encontrar el producto en la lista de productos global.
+        let producto = productos.find(item => item.id == id);
+
+        if (!producto) {
+          console.error("Producto no encontrado");
+          return;
+        }
+
+        if (productoEnCarrito) {
+          // Incrementa la cantidad si ya está en el carrito
+          productoEnCarrito.quantity++;
+        } else {
+          // Si no está en el carrito, añádelo
+          carrito.push({
+            id: producto.id,
+            name: producto.name,
+            price: producto.price,
+            quantity: 1
+          });
+        }
+
+        renderCartItems();
+      };
+
+      const removeFromCart = (id) => {
+        let index = carrito.findIndex(item => item.id == id);
+
+        if (index !== -1) {
+          carrito.splice(index, 1);
+        }
+
+        renderCartItems();
       };
 
       $search.addEventListener("keypress", async (e) => {
@@ -94,7 +209,7 @@
             return;
           }
 
-          let productos = await fetchProductos(query);
+          productos = await fetchProductos(query);  // Asignar la respuesta de productos a la variable global
 
           if (productos) {
             renderProductos(productos);
