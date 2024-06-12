@@ -5,105 +5,103 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AUTOMUNDOLAVADORAS</title>
     <style>
-      .grid-fluid{
+      .grid-fluid {
         display: grid;
-        grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
       }
 
-      .loader{
+      img {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .producto {
+        border: 1px solid #ccc;
+        padding: 1rem;
+        text-align: center;
+      }
+
+      .loader {
         display: block;
         margin: auto;
-      }
-      img{
-        max-width: 100%;
       }
     </style>
 </head>
 <body>
   <h1>BIENVENIDOS A MUNDOLAVADORAS</h1>
-  <h2>QUE REPUESTO NECESITAS?</h2>
-  <input type="search" id="search" placeholder="BUSCAR PRODUCTOS....">
+  <h2>¿QUÉ REPUESTO NECESITAS?</h2>
+  <input type="search" id="search" placeholder="BUSCAR PRODUCTOS...">
   <section id="productos" class="grid-fluid"></section> 
   <template id="producto-template">
     <article class="producto">
-      <h3></h3>
-      <h4></h4>
-      <div></div>
-      <img>
-      <a></a>
+      <h3 class="name"></h3>
+      <img class="image" alt="Imagen del producto">
+      <p class="price"></p>
+      <p class="stock"></p>
     </article>
   </template> 
-  
+
   <script>
-   
- 
+    document.addEventListener("DOMContentLoaded", () => {
+      const d = document,
+            $search = d.getElementById("search"),
+            $productos = d.getElementById("productos"),
+            $template = d.getElementById("producto-template").content,
+            $fragment = d.createDocumentFragment();
 
+      const fetchProductos = async (query) => {
+        try {
+          // Usa tu URL aquí
+          let api = `https://mundolavadoras.com/wp-json/wc/v3/products?search=${encodeURIComponent(query)}&consumer_key=ck_ac71f77112971d39f3e349dd4a2d0ffbafb21f7a&consumer_secret=cs_fb4fea0b0b698bc83365c2fccb73720003f8da4a`;
+          let res = await fetch(api);
 
-    const d = document,
-    $productos = d.getElementById("productos"),
-    $template = d.getElementById("producto-template").content,
-    $fragment = d.createDocumentFragment();
+          if (!res.ok) throw { status: res.status, statusText: res.statusText };
 
-    d.addEventListener("keypress", async e => {
-  if (e.target.matches("#search")) {
-    if (e.key === "Enter") {
-      try {
-  
-        let query = e.target.value.toLowerCase(); // Convertir la consulta a minúsculas
-        api = `https://mundolavadoras.com/wp-json/wc/v2/products?consumer_key=ck_ac71f77112971d39f3e349dd4a2d0ffbafb21f7a&consumer_secret=cs_fb4fea0b0b698bc83365c2fccb73720003f8da4a&per_page=50`;
-        res = await fetch(api);
-        json = await res.json();
-        console.log(json);
+          return await res.json();
+        } catch (err) {
+          console.error(`Error ${err.status}: ${err.statusText}`);
+          $productos.innerHTML = `<h2>Error ${err.status}: ${err.statusText}</h2>`;
+        }
+      };
 
-        $productos.innerHTML = ""; // Limpiar el contenido previo
-
-        const productosCoincidentes = json.filter(producto =>
-          producto.name.toLowerCase().includes(query)
-        );
-
-        if (productosCoincidentes.length === 0) {
-          $productos.innerHTML = `<h2>NO EXISTEN PRODUCTOS PARA ESTA BUSQUEDA</h2>`;
-        } else {
-          for (let producto of productosCoincidentes) {
-            $template.querySelector("h3").textContent = producto.price;
-            $template.querySelector("h4").textContent = producto.name;
-
-            $template.querySelector("div").textContent =
-              producto.description || "sin descripción";
-            $template.querySelector("img").src = producto.images[0].src;
-            let $clone = d.importNode($template, true);
-            $fragment.appendChild($clone);
-          }
-          $productos.appendChild($fragment);
+      const renderProductos = (productos) => {
+        $productos.innerHTML = "";
+        
+        if (productos.length === 0) {
+          $productos.innerHTML = "<h2>NO EXISTEN PRODUCTOS PARA ESTA BÚSQUEDA</h2>";
+          return;
         }
 
-        if (!res.ok) throw { status: res.status, statusText: res.statusText };
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  }
-});
+        productos.forEach(producto => {
+          $template.querySelector(".name").textContent = producto.name;
+          $template.querySelector(".price").textContent = `Precio: ${producto.price}`;
+          $template.querySelector(".stock").textContent = `Cantidad: ${producto.stock_quantity || 'No disponible'}`;
+          $template.querySelector(".image").src = producto.images.length ? producto.images[0].src : '';
+          
+          let $clone = d.importNode($template, true);
+          $fragment.appendChild($clone);
+        });
+
+        $productos.appendChild($fragment);
+      };
+
+      $search.addEventListener("keypress", async (e) => {
+        if (e.key === "Enter") {
+          let query = e.target.value.trim().toLowerCase();
+          if (query === "") {
+            $productos.innerHTML = "<h2>Por favor, ingresa un término de búsqueda</h2>";
+            return;
+          }
+
+          let productos = await fetchProductos(query);
+
+          if (productos) {
+            renderProductos(productos);
+          }
+        }
+      });
+    });
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
