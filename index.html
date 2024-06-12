@@ -192,7 +192,8 @@
             id: producto.id,
             name: producto.name,
             price: producto.price,
-            quantity: 1
+            quantity: 1,
+            stock_quantity: producto.stock_quantity // Guardar cantidad de stock para futuras referencias
           });
         }
 
@@ -212,12 +213,12 @@
       const checkout = async () => {
         try {
           let url = 'https://mundolavadoras.com/wp-json/wc/v3/products/batch';
-          let updates = carrito.map(item => ({
-            id: item.id,
-            quantity: {
-              value: item.stock_quantity - item.quantity
-            }
-          }));
+          let updates = {
+            update: carrito.map(item => ({
+              id: item.id,
+              stock_quantity: item.stock_quantity - item.quantity
+            }))
+          };
 
           let res = await fetch(url, {
             method: 'POST',
@@ -225,14 +226,14 @@
               'Content-Type': 'application/json',
               'Authorization': 'Basic ' + btoa('ck_ac71f77112971d39f3e349dd4a2d0ffbafb21f7a:cs_fb4fea0b0b698bc83365c2fccb73720003f8da4a')
             },
-            body: JSON.stringify({ update: updates })
+            body: JSON.stringify(updates)
           });
 
           if (!res.ok) throw { status: res.status, statusText: res.statusText };
 
           let json = await res.json();
           console.log(json);
-          
+
           // Limpiar carrito después de la compra
           carrito.length = 0;
           renderCartItems();
