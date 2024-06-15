@@ -21,6 +21,7 @@
         border-left: 1px solid #ccc;
         padding: 1rem;
         max-width: 300px;
+        border: 2px solid red; /* Borde rojo para el carrito */
       }
 
       img {
@@ -61,11 +62,24 @@
         flex: 1;
         text-align: right;
       }
+
+      h1 {
+        font-size: 3em; /* Doble de tamaño de la fuente */
+        color: red; /* Color rojo */
+        text-align: center; /* Centrar el texto */
+      }
+
+      #search {
+        width: 100%; /* Hacer el campo de búsqueda más ancho */
+        padding: 0.5rem; /* Agregar padding para que sea más grande */
+        font-size: 1em; 
+        margin-bottom: 1rem; /* Espacio adicional debajo del campo de búsqueda */
+      }
     </style>
 </head>
 <body>
-  <h1>BIENVENIDOS A MUNDOLAVADORAS</h1>
-  <h2>¿QUÉ REPUESTO NECESITAS?</h2>
+  <h1>POS MUNDOLAVADORAS</h1>
+  <h2>¿QUÉ REPUESTO BUSCAS?</h2>
   <input type="search" id="search" placeholder="BUSCAR PRODUCTOS...">
   <div class="container">
     <section id="productos" class="grid-fluid"></section> 
