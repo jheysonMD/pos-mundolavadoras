@@ -64,7 +64,7 @@
       }
 
       h1 {
-        font-size: 3em; /* Doble de tamaño de la fuente */
+        font-size: 2em; /* Doble de tamaño de la fuente */
         color: red; /* Color rojo */
         text-align: center; /* Centrar el texto */
       }
@@ -226,21 +226,25 @@
 
       const checkout = async () => {
         try {
-          let url = 'https://mundolavadoras.com/wp-json/wc/v3/products/batch';
-          let updates = {
-            update: carrito.map(item => ({
-              id: item.id,
-              stock_quantity: item.stock_quantity - item.quantity
+          // Crear la estructura del pedido
+          let order = {
+            payment_method: "bacs",   // Método de pago (ajustar si es necesario)
+            payment_method_title: "Direct Bank Transfer", // Descripción del método de pago
+            set_paid: true,    // Marcar como pagado
+            line_items: carrito.map(item => ({
+              product_id: item.id,
+              quantity: item.quantity
             }))
           };
 
-          let res = await fetch(url, {
+          let orderUrl = 'https://mundolavadoras.com/wp-json/wc/v3/orders';
+          let res = await fetch(orderUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Basic ' + btoa('ck_ac71f77112971d39f3e349dd4a2d0ffbafb21f7a:cs_fb4fea0b0b698bc83365c2fccb73720003f8da4a')
             },
-            body: JSON.stringify(updates)
+            body: JSON.stringify(order)
           });
 
           if (!res.ok) throw { status: res.status, statusText: res.statusText };
