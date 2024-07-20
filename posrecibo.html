@@ -89,62 +89,77 @@
         @media print {
             body * {
                 visibility: hidden;
-                padding: 0;
-                margin: 0;
             }
             #receipt, #receipt * {
                 visibility: visible;
             }
             #receipt {
                 position: absolute;
-                left: 2mm; /* Desplazar 5mm a la derecha */
+                left: 50%;
                 top: 0;
-                width: 100mm; /* Aumentar el ancho total a 82mm */
-                font-size: 14px; 
+                transform: translateX(-50%);
+                width: 80mm;
+                font-size: 12px;
                 line-height: 1.2;
-                white-space: nowrap;
-                font-family: 'Courier New', monospace; 
-                padding: 2mm;
-                color: #000000; /* Color puro negro */
-                font-weight: bold; /* Peso de fuente más grueso */
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                font-family: 'Courier New', monospace;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
             }
-            .receipt-logo img {
-                max-width: 100%;
-                height: auto; /* Ajustar la altura automáticamente */
-                display: block;
-                margin: 0 auto 10px; /* Centrar y añadir margen hacia abajo */
+            .receipt-header, .receipt-footer {
+                text-align: center;
+                margin: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
             }
-            .receipt-table {
+            .receipt-header p, .receipt-footer p {
+                margin: 2px 0;
+            }
+            .receipt-content {
+                width: 100%;
+                border-top: 1px dashed #000;
+                border-bottom: 1px dashed #000;
+                padding: 5px 0;
+            }
+            .receipt-content table {
                 width: 100%;
                 border-collapse: collapse;
-                margin-bottom: 10px;
+                display: flex;
+                flex-direction: column;
             }
-            .receipt-table, .receipt-table th, .receipt-table td {
-                border: 1px solid black;
+            .receipt-content th, .receipt-content td {
+                border: none;
+                padding: 2px 5px;
             }
-            .receipt-table th, .receipt-table td {
-                padding: 5px;
+            .receipt-content th {
+                font-weight: bold;
+            }
+
+            .receipt-content tr {
+                display: flex;
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .receipt-content th:nth-child(1),
+            .receipt-content td:nth-child(1) {
+                flex: 0 0 50mm; /* 50mm para productos */
                 text-align: left;
             }
-            .receipt-table th:nth-child(1),
-            .receipt-table td:nth-child(1) {
-                width: 65%; /* Aumentar el ancho de la primera columna */
+
+            .receipt-content th:nth-child(2),
+            .receipt-content td:nth-child(2) {
+                flex: 0 0 10mm; /* 10mm para cantidades */
+                text-align: right;
             }
-            .receipt-table th:nth-child(2),
-            .receipt-table td:nth-child(2) {
-                width: 18%; /* Reducir el ancho de la segunda columna */
-            }
-            .receipt-table th:nth-child(3),
-            .receipt-table td:nth-child(3) {
-                width: 17%; /* Ajustar el ancho de la tercera columna */
-            }
-            .center-text {
-                text-align: center;
-                margin-left: 5mm;
-                margin-right: 5mm;
-            }
-            .receipt-footer p {
-                margin-top: 5mm; 
+
+            .receipt-content th:nth-child(3),
+            .receipt-content td:nth-child(3) {
+                flex: 0 0 20mm; /* 20mm para precios */
+                text-align: right;
             }
         }
     </style>
@@ -183,45 +198,37 @@
         </div>
     </template>
     <div id="receipt" style="display: none;">
-        <div class="receipt-logo">
-            <img src="imagenes/logo.png" alt="Logo de Mundolavadoras"> <!-- Asegúrate de que esta ruta sea correcta -->
-        </div>
-        <div class="center-text">
-            <h3>MUNDOLAVADORAS</h3>
-            <p>Calle 10#6-29 sucre</p>
-            <p>Tel 3186967164</p>
-            <p>Pitalito-Huila</p>
+        <div class="receipt-header">
+            <p><strong>MUNDOLAVADORAS</strong></p>
+            <p>Calle Falsa 123, Springfield</p>
+            <p>Tel: (123) 456-7890</p>
             <p id="receipt-date"></p>
         </div>
-        <table class="receipt-table">
-            <thead>
-                <tr>
-                    <th>Producto</th>
-                    <th>Cant</th>
-                    <th>Precio</th>
-                </tr>
-            </thead>
-            <tbody id="receipt-body">
-                <!-- Se llena con la función printReceipt -->
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="2">Total</td>
-                    <td id="receipt-total"></td>
-                </tr>
-            </tfoot>
-        </table>
-        <div id="receipt-footer" class="center-text receipt-footer">
-            <p id="footer-message-2">Artículos eléctricos no tienen garantía</p>
-            <p id="footer-message-1">Gracias por su compra!</p>
+        <div class="receipt-content">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cant.</th>
+                        <th>Precio</th>
+                    </tr>
+                </thead>
+                <tbody id="receipt-items">
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2" style="text-align: left;">Total:</td>
+                        <td id="receipt-total" style="text-align: right;"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div class="receipt-footer">
+            <p>Gracias por su compra!</p>
+            <p>Artículos eléctricos no tienen garantía</p>
         </div>
     </div>
-
     <script>
-        function formatPrice(number) {
-            return number.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-        }
-
         document.addEventListener("DOMContentLoaded", () => {
             const d = document,
                 $search = d.getElementById("search"),
@@ -258,7 +265,7 @@
 
                 productos.forEach(producto => {
                     $template.querySelector(".name").textContent = producto.name;
-                    $template.querySelector(".price").textContent = `Precio: $${formatPrice(parseFloat(producto.price))}`;
+                    $template.querySelector(".price").textContent = `Precio: $${parseFloat(producto.price).toFixed(2)}`;
                     $template.querySelector(".stock").textContent = `Cantidad: ${producto.stock_quantity || 'No disponible'}`;
                     $template.querySelector(".image").src = producto.images.length ? producto.images[0].src : '';
                     $template.querySelector(".add-to-cart").dataset.id = producto.id;
@@ -279,7 +286,7 @@
                 carrito.forEach(item => {
                     $cartItemTemplate.querySelector(".name").textContent = item.name;
                     $cartItemTemplate.querySelector(".quantity").textContent = `Cant: ${item.quantity}`;
-                    $cartItemTemplate.querySelector(".price").textContent = `Precio: $${formatPrice(parseFloat(item.price))}`;
+                    $cartItemTemplate.querySelector(".price").textContent = `Precio: $${parseFloat(item.price).toFixed(2)}`;
                     $cartItemTemplate.querySelector(".remove-from-cart").dataset.id = item.id;
 
                     totalPrice += parseFloat(item.price) * item.quantity;
@@ -289,7 +296,7 @@
                 });
                 $cartItems.appendChild($fragment);
 
-                d.getElementById("total-price").textContent = `Total: $${formatPrice(totalPrice)}`;
+                d.getElementById("total-price").textContent = `Total: $${totalPrice.toFixed(2)}`;
                 d.getElementById("print-btn").style.display = carrito.length > 0 ? "block" : "none";
 
                 d.querySelectorAll(".remove-from-cart").forEach(btn => {
@@ -319,7 +326,6 @@
                         name: producto.name,
                         price: producto.price,
                         quantity: 1,
-                        stock_quantity: producto.stock_quantity
                     });
                 }
 
@@ -373,30 +379,44 @@
             };
 
             const printReceipt = () => {
-                const $receiptBody = document.getElementById("receipt-body");
-                const $receiptTotal = document.getElementById("receipt-total");
                 const $receiptDate = document.getElementById("receipt-date");
+                const $receiptItems = document.getElementById("receipt-items");
+                const $receiptTotal = document.getElementById("receipt-total");
+
                 const date = new Date().toLocaleString();
 
-                $receiptBody.innerHTML = ''; // Limpiar contenido previo
-                $receiptDate.textContent = date; // Añadir la fecha
+                // Fecha en el encabezado
+                $receiptDate.textContent = date;
+
+                // Limpiar el contenido del recibo
+                $receiptItems.innerHTML = "";
+                $receiptTotal.innerHTML = "";
 
                 carrito.forEach(item => {
-                    const row = `<tr>
-                        <td>${item.name.length > 28 ? item.name.substring(0, 28) + '...' : item.name}</td>
-                        <td>${item.quantity}</td>
-                        <td>${formatPrice(parseFloat(item.price) * item.quantity)}</td>
-                    </tr>`;
-                    $receiptBody.insertAdjacentHTML('beforeend', row);
+                    const nombre = item.name.length > 18 ? item.name.substring(0, 18) + '...' : item.name;
+                    const totalItem = parseFloat(item.price) * item.quantity;
+
+                    $receiptItems.innerHTML += `
+                        <tr>
+                            <td>${nombre}</td>
+                            <td>${item.quantity}</td>
+                            <td>$${totalItem.toFixed(2)}</td>
+                        </tr>
+                    `;
                 });
 
-                const total = formatPrice(carrito.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0));
+                const total = carrito.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+                $receiptTotal.textContent = `$${total.toFixed(2)}`;
 
-                $receiptTotal.textContent = `${total}`;
-
+                // Mostrar el recibo antes de imprimir para asegurarnos de que el contenido es visible
                 document.getElementById("receipt").style.display = 'block';
-                window.print();
-                document.getElementById("receipt").style.display = 'none';
+
+                // Esperar un breve momento para que el navegador renderice el contenido visible
+                setTimeout(() => {
+                    window.print();
+                    // Ocultar el recibo después de imprimir
+                    document.getElementById("receipt").style.display = 'none';
+                }, 500);
             };
 
             $search.addEventListener("keypress", async (e) => {
