@@ -235,7 +235,7 @@
             const carrito = [];
 
             const fetchProductos = async (query) => {
-                try {
+            const checkout = async () => {
                     let api = `https://mundolavadoras.com/wp-json/wc/v3/products?search=${encodeURIComponent(query)}&consumer_key=ck_ac71f77112971d39f3e349dd4a2d0ffbafb21f7a&consumer_secret=cs_fb4fea0b0b698bc83365c2fccb73720003f8da4a`;
                     let res = await fetch(api);
 
@@ -349,7 +349,7 @@
                     renderCartItems();
                 }
             };
-                try {
+            const checkout = async () => {
                     let order = {
                         payment_method: "bacs",
                         payment_method_title: "Direct Bank Transfer",
