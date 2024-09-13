@@ -177,7 +177,7 @@
     <template id="cart-item-template">
         <div class="cart-item">
             <span class="name"></span>
-            <span class="quantity"></span>
+            <input type="number" class="quantity" min="1" value="1">
             <span class="price"></span>
             <button class="remove-from-cart">x</button>
         </div>
@@ -264,6 +264,7 @@
                     $template.querySelector(".add-to-cart").dataset.id = producto.id;
                     let $clone = d.importNode($template, true);
                     $fragment.appendChild($clone);
+                    $cartItemTemplate.querySelector(".quantity").addEventListener("change", (e) => updateCartItemQuantity(item.id, e.target.value));
                 });
 
                 $productos.appendChild($fragment);
@@ -278,7 +279,7 @@
                 let totalPrice = 0;
                 carrito.forEach(item => {
                     $cartItemTemplate.querySelector(".name").textContent = item.name;
-                    $cartItemTemplate.querySelector(".quantity").textContent = `Cant: ${item.quantity}`;
+                    $cartItemTemplate.querySelector(".quantity").value = item.quantity;
                     $cartItemTemplate.querySelector(".price").textContent = `Precio: $${formatPrice(parseFloat(item.price) * item.quantity)}`;
                     $cartItemTemplate.querySelector(".remove-from-cart").dataset.id = item.id;
 
@@ -336,7 +337,18 @@
                 renderCartItems();
             };
 
-            const checkout = async () => {
+            const updateCartItemQuantity = (id, quantity) => {
+                let productoEnCarrito = carrito.find(item => item.id == id);
+                if (productoEnCarrito) {
+                    if (quantity <= productoEnCarrito.stock_quantity) {
+                        productoEnCarrito.quantity = quantity;
+                    } else {
+                        alert("No puedes agregar más de lo que hay en stock");
+                        productoEnCarrito.quantity = productoEnCarrito.stock_quantity;
+                    }
+                    renderCartItems();
+                }
+            };
                 try {
                     let order = {
                         payment_method: "bacs",
