@@ -279,7 +279,7 @@
                 carrito.forEach(item => {
                     $cartItemTemplate.querySelector(".name").textContent = item.name;
                     $cartItemTemplate.querySelector(".quantity").textContent = `Cant: ${item.quantity}`;
-                    $cartItemTemplate.querySelector(".price").textContent = `Precio: $${formatPrice(parseFloat(item.price))}`;
+                    $cartItemTemplate.querySelector(".price").textContent = `Precio: $${formatPrice(parseFloat(item.price) * item.quantity)}`;
                     $cartItemTemplate.querySelector(".remove-from-cart").dataset.id = item.id;
 
                     totalPrice += parseFloat(item.price) * item.quantity;
