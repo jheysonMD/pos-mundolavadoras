@@ -265,7 +265,6 @@
                     $template.querySelector(".add-to-cart").dataset.id = producto.id;
                     let $clone = d.importNode($template, true);
                     $fragment.appendChild($clone);
-                    $cartItemTemplate.querySelector(".quantity").addEventListener("change", (e) => updateCartItemQuantity(item.id, e.target.value));
                 });
 
                 $productos.appendChild($fragment);
@@ -280,13 +279,18 @@
                 let totalPrice = 0;
                 carrito.forEach(item => {
                     $cartItemTemplate.querySelector(".name").textContent = item.name;
-                    $cartItemTemplate.querySelector(".quantity").value = item.quantity;
-                    $cartItemTemplate.querySelector(".price").textContent = `Precio: $${formatPrice(parseFloat(item.price) * item.quantity)}`;
-                    $cartItemTemplate.querySelector(".remove-from-cart").dataset.id = item.id;
+                    const $clone = d.importNode($cartItemTemplate, true);
+                    $clone.querySelector(".name").textContent = item.name;
+                    $clone.querySelector(".quantity").value = item.quantity;
+                    $clone.querySelector(".price").textContent = `Precio: $${formatPrice(parseFloat(item.price) * item.quantity)}`;
+                    $clone.querySelector(".remove-from-cart").dataset.id = item.id;
 
                     totalPrice += parseFloat(item.price) * item.quantity;
 
-                    let $clone = d.importNode($cartItemTemplate, true);
+                    $clone.querySelector(".quantity").addEventListener("change", (e) => {
+                        updateCartItemQuantity(item.id, parseInt(e.target.value, 10));
+                    });
+
                     $fragment.appendChild($clone);
                 });
                 $cartItems.appendChild($fragment);
