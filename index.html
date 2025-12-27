@@ -371,6 +371,7 @@
                         <button class="btn scanner-btn" id="toggle-scanner">📷 Escanear</button>
                     </div>
                 </div>
+                <button class="btn btn-danger" id="clear-search-btn" style="width: 100%; margin-top: 10px; display: none;">🗑️ Limpiar Búsqueda</button>
                 <div id="qr-reader"></div>
                 <div id="camera-status"></div>
             </section>
@@ -508,9 +509,11 @@
         }
 
         // FETCH PRODUCTOS
-        async function fetchProducts(query) {
+        async function fetchProducts(query, acumular = false) {
             $loader.style.display = "block";
-            $productos.innerHTML = "";
+            if (!acumular) {
+                $productos.innerHTML = "";
+            }
             try {
                 // Intentar por búsqueda general
                 let api = `${STORE_MAIN.url}?search=${encodeURIComponent(query)}&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`;
@@ -524,14 +527,37 @@
                     products = await res.json();
                 }
 
-                productosCache = products;
-                renderProducts(products);
+                // Si acumulamos, agregar sin duplicar
+                if (acumular) {
+                    products.forEach(p => {
+                        if (!productosCache.find(cached => cached.id === p.id)) {
+                            productosCache.push(p);
+                        }
+                    });
+                } else {
+                    productosCache = products;
+                }
+                
+                renderProducts(products, acumular);
+                
+                // Mostrar botón limpiar
+                const clearBtn = d.getElementById("clear-search-btn");
+                clearBtn.style.display = productosCache.length > 0 ? "block" : "none";
             } catch (err) {
                 console.error(err);
-                $productos.innerHTML = "<h3>Error al cargar productos</h3>";
+                if (!acumular) {
+                    $productos.innerHTML = "<h3>Error al cargar productos</h3>";
+                }
             } finally {
                 $loader.style.display = "none";
             }
+        }
+
+        function clearSearch() {
+            $productos.innerHTML = "";
+            productosCache = [];
+            d.getElementById("search").value = "";
+            d.getElementById("clear-search-btn").style.display = "none";
         }
 
         async function getBusinessPrice(sku) {
@@ -552,13 +578,19 @@
             return null;
         }
 
-        async function renderProducts(products) {
+        async function renderProducts(products, acumular = false) {
             const template = d.getElementById("producto-template").content;
             const fragment = d.createDocumentFragment();
 
             for (const p of products) {
+                // Evitar duplicados si estamos acumulando
+                if (acumular && Array.from($productos.children).find(child => child.dataset.productId === String(p.id))) {
+                    continue;
+                }
+                
                 const clone = d.importNode(template, true);
                 const card = clone.querySelector(".product-card");
+                card.dataset.productId = p.id;
                 
                 clone.querySelector(".name").textContent = p.name;
                 clone.querySelector(".product-price").textContent = formatPrice(parseFloat(p.price));
@@ -571,8 +603,7 @@
                 const bizPrice = await getBusinessPrice(p.sku);
                 
                 if (bizPrice && bizPrice < parseFloat(p.price)) {
-                    // Mostrar badge y precio de negocio
-                    clone.querySelector(".business-badge").style.display = "inline-block";
+                    // Mostrar solo precio de negocio (sin badge naranja)
                     const bizPriceEl = clone.querySelector(".business-price");
                     bizPriceEl.textContent = `Negocio: ${formatPrice(bizPrice)}`;
                     bizPriceEl.style.display = "block";
@@ -789,7 +820,7 @@
                         (decodedText) => {
                             statusDiv.innerHTML = '<p style="color: #27ae60; padding: 10px;">✅ Código detectado!</p>';
                             d.getElementById("search").value = decodedText;
-                            fetchProducts(decodedText);
+                            fetchProducts(decodedText, true); // true = acumular
                             stopScanner();
                         },
                         (errorMessage) => {
@@ -862,7 +893,7 @@
             if (e.key === 'Enter') {
                 if (scannerBuffer.length > 3) { // Códigos de barras suelen tener más de 3 caracteres
                     d.getElementById("search").value = scannerBuffer;
-                    fetchProducts(scannerBuffer);
+                    fetchProducts(scannerBuffer, true); // true = acumular
                     scannerBuffer = '';
                 }
             } else {
@@ -874,9 +905,10 @@
         });
 
         // EVENTOS
-        d.getElementById("search-btn").onclick = () => fetchProducts(d.getElementById("search").value);
-        d.getElementById("search").onkeypress = (e) => { if(e.key === "Enter") fetchProducts(e.target.value); };
+        d.getElementById("search-btn").onclick = () => fetchProducts(d.getElementById("search").value, false); // false = reemplazar
+        d.getElementById("search").onkeypress = (e) => { if(e.key === "Enter") fetchProducts(e.target.value, false); };
         d.getElementById("toggle-scanner").onclick = initScanner;
+        d.getElementById("clear-search-btn").onclick = clearSearch;
         d.getElementById("checkout-btn").onclick = checkout;
         d.getElementById("print-btn").onclick = printReceipt;
         d.getElementById("cart-toggle").onclick = () => $sidebar.classList.toggle("active");
