@@ -499,6 +499,7 @@
         let scannerBuffer = '';
         let scannerTimeout = null;
         let currentProduct = null;
+        let searchTimeout = null;
 
         function formatPrice(number) {
             return new Intl.NumberFormat('es-CO', {
@@ -904,9 +905,37 @@
             }
         });
 
+        // BÚSQUEDA EN TIEMPO REAL
+        d.getElementById("search").oninput = (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            
+            if (query.length >= 3) {
+                // Esperar 500ms después del último carácter antes de buscar
+                searchTimeout = setTimeout(() => {
+                    fetchProducts(query, false);
+                }, 500);
+            } else if (query.length === 0) {
+                clearSearch();
+            }
+        };
+
         // EVENTOS
-        d.getElementById("search-btn").onclick = () => fetchProducts(d.getElementById("search").value, false); // false = reemplazar
-        d.getElementById("search").onkeypress = (e) => { if(e.key === "Enter") fetchProducts(e.target.value, false); };
+        d.getElementById("search-btn").onclick = () => {
+            const query = d.getElementById("search").value.trim();
+            if (query.length > 0) {
+                fetchProducts(query, false);
+            }
+        };
+        d.getElementById("search").onkeypress = (e) => { 
+            if(e.key === "Enter") {
+                clearTimeout(searchTimeout); // Cancelar el timeout si presiona Enter
+                const query = e.target.value.trim();
+                if (query.length > 0) {
+                    fetchProducts(query, false);
+                }
+            }
+        };
         d.getElementById("toggle-scanner").onclick = initScanner;
         d.getElementById("clear-search-btn").onclick = clearSearch;
         d.getElementById("checkout-btn").onclick = checkout;
