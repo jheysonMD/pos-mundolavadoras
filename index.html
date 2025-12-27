@@ -95,9 +95,28 @@
         }
 
         .search-box {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr auto auto;
             gap: 10px;
             margin-bottom: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .search-box {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .search-box input {
+                grid-column: 1;
+            }
+            
+            .btn-group {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                grid-column: 1;
+            }
         }
 
         input[type="search"], input[type="text"] {
@@ -347,8 +366,10 @@
             <section class="search-section">
                 <div class="search-box">
                     <input type="search" id="search" placeholder="Buscar por nombre o SKU...">
-                    <button class="btn btn-primary" id="search-btn">🔍</button>
-                    <button class="btn scanner-btn" id="toggle-scanner">📷</button>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="search-btn">🔍 Buscar</button>
+                        <button class="btn scanner-btn" id="toggle-scanner">📷 Escanear</button>
+                    </div>
                 </div>
                 <div id="qr-reader"></div>
                 <div id="camera-status"></div>
