@@ -688,7 +688,8 @@
                     line_items: carrito.map(i => ({ product_id: i.id, quantity: i.quantity }))
                 };
 
-                const res = await fetch(STORE_MAIN.url.replace('products', 'orders'), {
+                const orderUrl = STORE_MAIN.url.replace('products', 'orders');
+                const res = await fetch(orderUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
