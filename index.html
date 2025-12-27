@@ -509,37 +509,79 @@
             }).format(number);
         }
 
-        // FETCH PRODUCTOS
+        // FETCH PRODUCTOS - Búsqueda mejorada por nombre Y SKU
         async function fetchProducts(query, acumular = false) {
             $loader.style.display = "block";
             if (!acumular) {
                 $productos.innerHTML = "";
             }
             try {
-                // Intentar por búsqueda general
-                let api = `${STORE_MAIN.url}?search=${encodeURIComponent(query)}&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`;
-                let res = await fetch(api);
-                let products = await res.json();
+                const lowerQuery = query.toLowerCase();
+                
+                // Hacer AMBAS búsquedas en paralelo para mejor cobertura
+                const [searchRes, skuRes] = await Promise.all([
+                    fetch(`${STORE_MAIN.url}?search=${encodeURIComponent(query)}&per_page=50&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`),
+                    fetch(`${STORE_MAIN.url}?sku=${encodeURIComponent(query)}&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`)
+                ]);
 
-                // Si no hay resultados, intentar por SKU exacto
-                if (products.length === 0) {
-                    api = `${STORE_MAIN.url}?sku=${encodeURIComponent(query)}&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`;
-                    res = await fetch(api);
-                    products = await res.json();
+                const [searchProducts, skuProducts] = await Promise.all([
+                    searchRes.json(),
+                    skuRes.json()
+                ]);
+
+                // Combinar y eliminar duplicados
+                const allProducts = [...searchProducts, ...skuProducts];
+                const uniqueProducts = [];
+                const seenIds = new Set();
+
+                for (const p of allProducts) {
+                    if (!seenIds.has(p.id)) {
+                        seenIds.add(p.id);
+                        uniqueProducts.push(p);
+                    }
                 }
+
+                // Filtrar por relevancia: debe contener la búsqueda en nombre o SKU
+                const filteredProducts = uniqueProducts.filter(p => {
+                    const name = (p.name || '').toLowerCase();
+                    const sku = (p.sku || '').toLowerCase();
+                    return name.includes(lowerQuery) || sku.includes(lowerQuery);
+                });
+
+                // Ordenar: primero SKU exacto, luego SKU parcial, luego nombre
+                filteredProducts.sort((a, b) => {
+                    const aSku = (a.sku || '').toLowerCase();
+                    const bSku = (b.sku || '').toLowerCase();
+                    const aName = (a.name || '').toLowerCase();
+                    const bName = (b.name || '').toLowerCase();
+                    
+                    // SKU exacto primero
+                    if (aSku === lowerQuery && bSku !== lowerQuery) return -1;
+                    if (bSku === lowerQuery && aSku !== lowerQuery) return 1;
+                    
+                    // SKU que empieza con la búsqueda
+                    if (aSku.startsWith(lowerQuery) && !bSku.startsWith(lowerQuery)) return -1;
+                    if (bSku.startsWith(lowerQuery) && !aSku.startsWith(lowerQuery)) return 1;
+                    
+                    // Nombre que empieza con la búsqueda
+                    if (aName.startsWith(lowerQuery) && !bName.startsWith(lowerQuery)) return -1;
+                    if (bName.startsWith(lowerQuery) && !aName.startsWith(lowerQuery)) return 1;
+                    
+                    return 0;
+                });
 
                 // Si acumulamos, agregar sin duplicar
                 if (acumular) {
-                    products.forEach(p => {
+                    filteredProducts.forEach(p => {
                         if (!productosCache.find(cached => cached.id === p.id)) {
                             productosCache.push(p);
                         }
                     });
                 } else {
-                    productosCache = products;
+                    productosCache = filteredProducts;
                 }
                 
-                renderProducts(products, acumular);
+                renderProducts(filteredProducts, acumular);
                 
                 // Mostrar botón limpiar
                 const clearBtn = d.getElementById("clear-search-btn");
