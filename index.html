@@ -807,7 +807,7 @@
                     
                     let errorMsg = "Error al acceder a la cámara";
                     
-                    if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
+                    if (err.name === 'NotAllowedError' || (err.message && err.message.includes('permission'))) {
                         errorMsg = "❌ Permiso denegado.\n\nVe a configuración del navegador y permite el acceso a la cámara.";
                     } else if (err.name === 'NotFoundError') {
                         errorMsg = "❌ No se encontró ninguna cámara en el dispositivo.";
