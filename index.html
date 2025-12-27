@@ -149,6 +149,7 @@
             text-align: center;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
 
         .product-card img {
@@ -176,10 +177,70 @@
             background: #f39c12;
             color: white;
             font-size: 10px;
-            padding: 2px 6px;
+            padding: 4px 8px;
             border-radius: 5px;
-            display: inline-block;
+            display: none;
             margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .business-price {
+            background: #27ae60;
+            color: white;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 5px;
+            display: block;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+
+        .price-selector {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.3);
+            z-index: 2000;
+            display: none;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .price-selector.active {
+            display: block;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1999;
+            display: none;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        .price-option {
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid #eee;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .price-option:hover {
+            border-color: var(--primary);
+            background: var(--gray-light);
         }
 
         /* Sidebar / Cart Styles */
@@ -361,13 +422,22 @@
     <template id="producto-template">
         <article class="product-card">
             <img class="image" src="" alt="">
-            <div class="business-badge" style="display: none;">Precio Negocio</div>
+            <div class="business-badge">Precio Negocio</div>
             <h3 class="name"></h3>
             <p class="product-price"></p>
+            <p class="business-price" style="display: none;"></p>
             <p class="stock" style="font-size: 10px; color: #7f8c8d;"></p>
             <button class="btn btn-success add-to-cart" style="width: 100%; margin-top: auto;">Agregar</button>
         </article>
     </template>
+
+    <!-- Price Selector Modal -->
+    <div class="overlay" id="overlay"></div>
+    <div class="price-selector" id="price-selector">
+        <h3 style="margin-bottom: 15px;">Selecciona el precio</h3>
+        <div id="price-options"></div>
+        <button class="btn btn-danger" onclick="closePriceSelector()" style="width: 100%; margin-top: 10px;">Cancelar</button>
+    </div>
 
     <template id="cart-item-template">
         <div class="cart-item">
@@ -404,6 +474,9 @@
         let carrito = JSON.parse(localStorage.getItem('carrito')) || [];
         let productosCache = [];
         let html5QrCode = null;
+        let scannerBuffer = '';
+        let scannerTimeout = null;
+        let currentProduct = null;
 
         function formatPrice(number) {
             return new Intl.NumberFormat('es-CO', {
@@ -464,47 +537,90 @@
 
             for (const p of products) {
                 const clone = d.importNode(template, true);
+                const card = clone.querySelector(".product-card");
+                
                 clone.querySelector(".name").textContent = p.name;
                 clone.querySelector(".product-price").textContent = formatPrice(parseFloat(p.price));
                 clone.querySelector(".stock").textContent = `Stock: ${p.stock_quantity || 0}`;
                 clone.querySelector(".image").src = p.images.length ? p.images[0].src : 'imagenes/logo.png';
                 
                 const addBtn = clone.querySelector(".add-to-cart");
-                addBtn.onclick = () => addToCart(p);
-
-                // Verificar precio de negocio de forma asíncrona
-                getBusinessPrice(p.sku).then(bizPrice => {
-                    if (bizPrice && bizPrice < parseFloat(p.price)) {
-                        const card = Array.from($productos.children).find(c => c.querySelector(".name").textContent === p.name);
-                        if (card) {
-                            const badge = card.querySelector(".business-badge");
-                            badge.style.display = "inline-block";
-                            badge.title = `Precio negocio: ${formatPrice(bizPrice)}`;
-                        }
-                    }
-                });
+                
+                // Buscar precio de negocio
+                const bizPrice = await getBusinessPrice(p.sku);
+                
+                if (bizPrice && bizPrice < parseFloat(p.price)) {
+                    // Mostrar badge y precio de negocio
+                    clone.querySelector(".business-badge").style.display = "inline-block";
+                    const bizPriceEl = clone.querySelector(".business-price");
+                    bizPriceEl.textContent = `Negocio: ${formatPrice(bizPrice)}`;
+                    bizPriceEl.style.display = "block";
+                    
+                    // Guardar ambos precios en el producto
+                    p.businessPrice = bizPrice;
+                    
+                    // Cambiar comportamiento del botón
+                    addBtn.onclick = () => showPriceSelector(p);
+                } else {
+                    addBtn.onclick = () => addToCart(p, parseFloat(p.price));
+                }
 
                 fragment.appendChild(clone);
             }
             $productos.appendChild(fragment);
         }
 
+        // SELECTOR DE PRECIO
+        function showPriceSelector(product) {
+            currentProduct = product;
+            const selector = d.getElementById("price-selector");
+            const overlay = d.getElementById("overlay");
+            const options = d.getElementById("price-options");
+            
+            options.innerHTML = `
+                <div class="price-option" onclick="addToCart(currentProduct, ${parseFloat(product.price)})">
+                    <strong>Precio Normal</strong>
+                    <div style="font-size: 18px; color: var(--success); margin-top: 5px;">
+                        ${formatPrice(parseFloat(product.price))}
+                    </div>
+                </div>
+                <div class="price-option" onclick="addToCart(currentProduct, ${product.businessPrice})">
+                    <strong>Precio Negocio</strong>
+                    <div style="font-size: 18px; color: #27ae60; margin-top: 5px;">
+                        ${formatPrice(product.businessPrice)}
+                    </div>
+                </div>
+            `;
+            
+            selector.classList.add("active");
+            overlay.classList.add("active");
+        }
+
+        function closePriceSelector() {
+            d.getElementById("price-selector").classList.remove("active");
+            d.getElementById("overlay").classList.remove("active");
+            currentProduct = null;
+        }
+
         // CARRITO
-        function addToCart(p) {
-            const item = carrito.find(i => i.id === p.id);
+        function addToCart(p, selectedPrice) {
+            const price = selectedPrice || parseFloat(p.price);
+            const item = carrito.find(i => i.id === p.id && i.price === price);
+            
             if (item) {
                 item.quantity++;
             } else {
                 carrito.push({
                     id: p.id,
                     name: p.name,
-                    price: parseFloat(p.price),
+                    price: price,
                     quantity: 1,
                     sku: p.sku
                 });
             }
             saveCart();
             renderCart();
+            closePriceSelector();
         }
 
         function removeFromCart(id) {
@@ -649,6 +765,30 @@
             }
         }
 
+        // ESCÁNER FÍSICO DE CÓDIGO DE BARRAS (USB)
+        d.addEventListener('keypress', (e) => {
+            // Ignorar si estamos escribiendo en un input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            
+            // El escáner físico envía los caracteres rápidamente y termina con Enter
+            clearTimeout(scannerTimeout);
+            
+            if (e.key === 'Enter') {
+                if (scannerBuffer.length > 3) { // Códigos de barras suelen tener más de 3 caracteres
+                    d.getElementById("search").value = scannerBuffer;
+                    fetchProducts(scannerBuffer);
+                    scannerBuffer = '';
+                }
+            } else {
+                scannerBuffer += e.key;
+                scannerTimeout = setTimeout(() => {
+                    scannerBuffer = ''; // Limpiar buffer si pasa mucho tiempo
+                }, 100);
+            }
+        });
+
         // EVENTOS
         d.getElementById("search-btn").onclick = () => fetchProducts(d.getElementById("search").value);
         d.getElementById("search").onkeypress = (e) => { if(e.key === "Enter") fetchProducts(e.target.value); };
@@ -656,6 +796,7 @@
         d.getElementById("checkout-btn").onclick = checkout;
         d.getElementById("print-btn").onclick = printReceipt;
         d.getElementById("cart-toggle").onclick = () => $sidebar.classList.toggle("active");
+        d.getElementById("overlay").onclick = closePriceSelector;
 
         // Service Worker
         if ('serviceWorker' in navigator) {
