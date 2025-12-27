@@ -759,30 +759,92 @@
         }
 
         // ESCÁNER QR
-        function initScanner() {
+        async function initScanner() {
             const reader = d.getElementById("qr-reader");
-            if (reader.style.display === "none") {
-                reader.style.display = "block";
-                html5QrCode = new Html5Qrcode("qr-reader");
-                html5QrCode.start(
-                    { facingMode: "environment" }, 
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                    (text) => {
-                        d.getElementById("search").value = text;
-                        fetchProducts(text);
-                        stopScanner();
-                    },
-                    (err) => {}
-                ).catch(e => alert("Error cámara: " + e));
+            const statusDiv = d.getElementById("camera-status");
+            const scanBtn = d.getElementById("toggle-scanner");
+            
+            if (reader.style.display === "none" || reader.style.display === "") {
+                try {
+                    // Verificar HTTPS
+                    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                        alert("⚠️ La cámara solo funciona con HTTPS.\n\nAsegúrate de que tu sitio cargue con https:// (candado 🔒)");
+                        return;
+                    }
+
+                    statusDiv.innerHTML = '<p style="color: #3498db; padding: 10px;">📷 Iniciando cámara...</p>';
+                    reader.style.display = "block";
+                    scanBtn.textContent = "❌ Cerrar";
+                    scanBtn.style.background = "#e74c3c";
+
+                    html5QrCode = new Html5Qrcode("qr-reader");
+                    
+                    await html5QrCode.start(
+                        { facingMode: "environment" }, 
+                        { 
+                            fps: 10, 
+                            qrbox: { width: 250, height: 250 },
+                            aspectRatio: 1.0
+                        },
+                        (decodedText) => {
+                            statusDiv.innerHTML = '<p style="color: #27ae60; padding: 10px;">✅ Código detectado!</p>';
+                            d.getElementById("search").value = decodedText;
+                            fetchProducts(decodedText);
+                            stopScanner();
+                        },
+                        (errorMessage) => {
+                            // Errores de escaneo continuo - ignorar
+                        }
+                    );
+                    
+                    statusDiv.innerHTML = '<p style="color: #27ae60; padding: 10px;">✅ Cámara activa. Enfoca un código QR</p>';
+                    
+                } catch (err) {
+                    console.error("Error al iniciar escáner:", err);
+                    reader.style.display = "none";
+                    scanBtn.textContent = "📷 Escanear";
+                    scanBtn.style.background = "#f1c40f";
+                    
+                    let errorMsg = "Error al acceder a la cámara";
+                    
+                    if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
+                        errorMsg = "❌ Permiso denegado.\n\nVe a configuración del navegador y permite el acceso a la cámara.";
+                    } else if (err.name === 'NotFoundError') {
+                        errorMsg = "❌ No se encontró ninguna cámara en el dispositivo.";
+                    } else if (err.name === 'NotReadableError') {
+                        errorMsg = "❌ La cámara está siendo usada por otra aplicación.";
+                    } else if (err.message) {
+                        errorMsg = `❌ Error: ${err.message}`;
+                    }
+                    
+                    statusDiv.innerHTML = `<p style="color: #e74c3c; padding: 10px;">${errorMsg.replace(/\n/g, '<br>')}</p>`;
+                    alert(errorMsg);
+                }
             } else {
                 stopScanner();
             }
         }
 
         function stopScanner() {
+            const reader = d.getElementById("qr-reader");
+            const statusDiv = d.getElementById("camera-status");
+            const scanBtn = d.getElementById("toggle-scanner");
+            
             if (html5QrCode) {
                 html5QrCode.stop().then(() => {
-                    d.getElementById("qr-reader").style.display = "none";
+                    reader.style.display = "none";
+                    statusDiv.innerHTML = "";
+                    scanBtn.textContent = "📷 Escanear";
+                    scanBtn.style.background = "#f1c40f";
+                    scanBtn.style.color = "#000";
+                    html5QrCode = null;
+                }).catch(err => {
+                    console.error("Error al detener escáner:", err);
+                    reader.style.display = "none";
+                    statusDiv.innerHTML = "";
+                    scanBtn.textContent = "📷 Escanear";
+                    scanBtn.style.background = "#f1c40f";
+                    scanBtn.style.color = "#000";
                 });
             }
         }
