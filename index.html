@@ -509,7 +509,7 @@
             }).format(number);
         }
 
-        // FETCH PRODUCTOS - Búsqueda mejorada por nombre Y SKU
+        // FETCH PRODUCTOS - Búsqueda híbrida mejorada para SKUs complejos
         async function fetchProducts(query, acumular = false) {
             $loader.style.display = "block";
             if (!acumular) {
@@ -517,23 +517,33 @@
             }
             try {
                 const lowerQuery = query.toLowerCase();
+                const cleanQuery = query.replace(/[^a-zA-Z0-9]/g, ''); // Sin caracteres especiales
                 
-                // Hacer AMBAS búsquedas en paralelo para mejor cobertura
-                const [searchRes, skuRes] = await Promise.all([
-                    fetch(`${STORE_MAIN.url}?search=${encodeURIComponent(query)}&per_page=50&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`),
+                // Estrategia múltiple: buscar de varias formas
+                const promises = [
+                    // Búsqueda general por nombre
+                    fetch(`${STORE_MAIN.url}?search=${encodeURIComponent(query)}&per_page=100&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`),
+                    // Búsqueda por SKU exacto
                     fetch(`${STORE_MAIN.url}?sku=${encodeURIComponent(query)}&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`)
-                ]);
-
-                const [searchProducts, skuProducts] = await Promise.all([
-                    searchRes.json(),
-                    skuRes.json()
-                ]);
-
-                // Combinar y eliminar duplicados
-                const allProducts = [...searchProducts, ...skuProducts];
+                ];
+                
+                // Si el query tiene guiones, también buscar sin ellos
+                if (query.includes('-')) {
+                    const withoutDash = query.replace(/-/g, '');
+                    promises.push(
+                        fetch(`${STORE_MAIN.url}?search=${encodeURIComponent(withoutDash)}&per_page=50&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`)
+                    );
+                }
+                
+                const responses = await Promise.all(promises);
+                const results = await Promise.all(responses.map(r => r.json()));
+                
+                // Combinar todos los resultados
+                const allProducts = results.flat();
+                
+                // Eliminar duplicados
                 const uniqueProducts = [];
                 const seenIds = new Set();
-
                 for (const p of allProducts) {
                     if (!seenIds.has(p.id)) {
                         seenIds.add(p.id);
@@ -541,29 +551,51 @@
                     }
                 }
 
-                // Filtrar por relevancia: debe contener la búsqueda en nombre o SKU
+                // Filtrado avanzado: buscar en SKU incluso con guiones
                 const filteredProducts = uniqueProducts.filter(p => {
                     const name = (p.name || '').toLowerCase();
                     const sku = (p.sku || '').toLowerCase();
-                    return name.includes(lowerQuery) || sku.includes(lowerQuery);
+                    const skuClean = sku.replace(/[^a-z0-9]/g, ''); // SKU sin caracteres especiales
+                    
+                    // Coincide si:
+                    // 1. Está en el nombre
+                    // 2. Está en el SKU original
+                    // 3. Está en el SKU sin caracteres especiales
+                    // 4. El SKU limpio contiene el query limpio
+                    return name.includes(lowerQuery) || 
+                           sku.includes(lowerQuery) ||
+                           sku.includes(cleanQuery) ||
+                           skuClean.includes(cleanQuery);
                 });
 
-                // Ordenar: primero SKU exacto, luego SKU parcial, luego nombre
+                // Ordenamiento por relevancia
                 filteredProducts.sort((a, b) => {
                     const aSku = (a.sku || '').toLowerCase();
                     const bSku = (b.sku || '').toLowerCase();
+                    const aSkuClean = aSku.replace(/[^a-z0-9]/g, '');
+                    const bSkuClean = bSku.replace(/[^a-z0-9]/g, '');
                     const aName = (a.name || '').toLowerCase();
                     const bName = (b.name || '').toLowerCase();
                     
-                    // SKU exacto primero
-                    if (aSku === lowerQuery && bSku !== lowerQuery) return -1;
-                    if (bSku === lowerQuery && aSku !== lowerQuery) return 1;
+                    // 1. SKU exacto (con o sin guiones)
+                    if ((aSku === lowerQuery || aSkuClean === cleanQuery) && 
+                        (bSku !== lowerQuery && bSkuClean !== cleanQuery)) return -1;
+                    if ((bSku === lowerQuery || bSkuClean === cleanQuery) && 
+                        (aSku !== lowerQuery && aSkuClean !== cleanQuery)) return 1;
                     
-                    // SKU que empieza con la búsqueda
-                    if (aSku.startsWith(lowerQuery) && !bSku.startsWith(lowerQuery)) return -1;
-                    if (bSku.startsWith(lowerQuery) && !aSku.startsWith(lowerQuery)) return 1;
+                    // 2. SKU que empieza con la búsqueda
+                    if ((aSku.startsWith(lowerQuery) || aSkuClean.startsWith(cleanQuery)) && 
+                        (!bSku.startsWith(lowerQuery) && !bSkuClean.startsWith(cleanQuery))) return -1;
+                    if ((bSku.startsWith(lowerQuery) || bSkuClean.startsWith(cleanQuery)) && 
+                        (!aSku.startsWith(lowerQuery) && !aSkuClean.startsWith(cleanQuery))) return 1;
                     
-                    // Nombre que empieza con la búsqueda
+                    // 3. SKU que contiene la búsqueda
+                    if ((aSku.includes(lowerQuery) || aSkuClean.includes(cleanQuery)) && 
+                        (!bSku.includes(lowerQuery) && !bSkuClean.includes(cleanQuery))) return -1;
+                    if ((bSku.includes(lowerQuery) || bSkuClean.includes(cleanQuery)) && 
+                        (!aSku.includes(lowerQuery) && !aSkuClean.includes(cleanQuery))) return 1;
+                    
+                    // 4. Nombre que empieza con la búsqueda
                     if (aName.startsWith(lowerQuery) && !bName.startsWith(lowerQuery)) return -1;
                     if (bName.startsWith(lowerQuery) && !aName.startsWith(lowerQuery)) return 1;
                     
