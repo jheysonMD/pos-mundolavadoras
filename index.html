@@ -469,6 +469,7 @@
             <img class="image" src="" alt="">
             <div class="business-badge">Precio Negocio</div>
             <h3 class="name"></h3>
+            <p class="sku" style="font-size: 11px; color: #95a5a6; margin: 5px 0; font-weight: bold;"></p>
             <p class="product-price"></p>
             <p class="business-price" style="display: none;"></p>
             <p class="stock" style="font-size: 10px; color: #7f8c8d;"></p>
@@ -867,6 +868,7 @@
                 card.dataset.productId = p.id;
                 
                 clone.querySelector(".name").textContent = p.name;
+                clone.querySelector(".sku").textContent = `SKU: ${p.sku || 'N/A'}`;
                 clone.querySelector(".product-price").textContent = formatPrice(parseFloat(p.price));
                 clone.querySelector(".stock").textContent = `Stock: ${p.stock_quantity || 0}`;
                 clone.querySelector(".image").src = p.images.length ? p.images[0].src : 'imagenes/logo.png';
