@@ -734,6 +734,9 @@
             const price = selectedPrice || parseFloat(p.price);
             const item = carrito.find(i => i.id === p.id && i.price === price);
             
+            // Marcar si el producto existe en ambas tiendas (tiene businessPrice)
+            const existsInBothStores = p.businessPrice !== null && p.businessPrice !== undefined;
+            
             if (item) {
                 item.quantity++;
             } else {
@@ -742,7 +745,8 @@
                     name: p.name,
                     price: price,
                     quantity: 1,
-                    sku: p.sku
+                    sku: p.sku,
+                    existsInBothStores: existsInBothStores // Marcar si está en ambas tiendas
                 });
             }
             saveCart();
@@ -808,29 +812,90 @@
             btn.textContent = "Registrando...";
 
             try {
-                const order = {
-                    payment_method: "bacs",
-                    payment_method_title: "POS Mundolavadoras",
-                    set_paid: true,
-                    line_items: carrito.map(i => ({ product_id: i.id, quantity: i.quantity }))
-                };
+                // Separar productos que existen en ambas tiendas
+                const itemsEnAmbasTiendas = carrito.filter(i => i.existsInBothStores);
+                
+                const promises = [];
+                
+                // SIEMPRE registrar venta en tienda principal (Mundolavadoras)
+                if (carrito.length > 0) {
+                    const order = {
+                        payment_method: "bacs",
+                        payment_method_title: "POS Mundolavadoras",
+                        set_paid: true,
+                        line_items: carrito.map(i => ({ product_id: i.id, quantity: i.quantity }))
+                    };
 
-                const orderUrl = STORE_MAIN.url.replace('products', 'orders');
-                const res = await fetch(orderUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Basic ' + btoa(`${STORE_MAIN.key}:${STORE_MAIN.secret}`)
-                    },
-                    body: JSON.stringify(order)
-                });
+                    const orderUrl = STORE_MAIN.url.replace('products', 'orders');
+                    promises.push(
+                        fetch(orderUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Basic ' + btoa(`${STORE_MAIN.key}:${STORE_MAIN.secret}`)
+                            },
+                            body: JSON.stringify(order)
+                        })
+                    );
+                }
+                
+                // Si hay productos que existen en ambas tiendas, TAMBIÉN descontar de tienda secundaria
+                if (itemsEnAmbasTiendas.length > 0) {
+                    // Buscar los IDs de los productos en la tienda de negocio por SKU
+                    const bizPromises = itemsEnAmbasTiendas.map(async item => {
+                        try {
+                            const api = `${STORE_BIZ.url}?sku=${encodeURIComponent(item.sku)}&consumer_key=${STORE_BIZ.key}&consumer_secret=${STORE_BIZ.secret}`;
+                            const res = await fetch(api);
+                            const products = await res.json();
+                            if (products.length > 0) {
+                                return {
+                                    product_id: products[0].id,
+                                    quantity: item.quantity
+                                };
+                            }
+                        } catch (e) {
+                            console.error("Error buscando producto en tienda negocio:", e);
+                        }
+                        return null;
+                    });
+                    
+                    const bizLineItems = (await Promise.all(bizPromises)).filter(item => item !== null);
+                    
+                    if (bizLineItems.length > 0) {
+                        const bizOrder = {
+                            payment_method: "bacs",
+                            payment_method_title: "POS Mundolavadoras (Sincronización inventario)",
+                            set_paid: true,
+                            line_items: bizLineItems
+                        };
+                        
+                        const bizOrderUrl = STORE_BIZ.url.replace('products', 'orders');
+                        promises.push(
+                            fetch(bizOrderUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Basic ' + btoa(`${STORE_BIZ.key}:${STORE_BIZ.secret}`)
+                                },
+                                body: JSON.stringify(bizOrder)
+                            })
+                        );
+                    }
+                }
 
-                if (res.ok) {
-                    alert("¡Venta registrada con éxito!");
+                const results = await Promise.all(promises);
+                const allOk = results.every(r => r.ok);
+                
+                if (allOk) {
+                    let message = "¡Venta registrada con éxito!";
+                    if (itemsEnAmbasTiendas.length > 0) {
+                        message += `\n\n✅ Inventario actualizado en AMBAS tiendas (${itemsEnAmbasTiendas.length} productos compartidos)`;
+                    }
+                    alert(message);
                     printReceipt();
                     clearCart();
                 } else {
-                    throw new Error("Error en servidor");
+                    throw new Error("Error al registrar en una o ambas tiendas");
                 }
             } catch (e) {
                 alert("Error al registrar: " + e.message);
