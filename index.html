@@ -1180,8 +1180,10 @@
                         },
                         (decodedText) => {
                             statusDiv.innerHTML = '<p style="color: #27ae60; padding: 10px;">✅ Código detectado!</p>';
-                            d.getElementById("search").value = decodedText;
-                            fetchProducts(decodedText, true); // true = acumular
+                            // Usar el campo de SKU para mostrar el código
+                            d.getElementById("search-sku").value = decodedText;
+                            // Buscar el producto escaneado
+                            searchBySKU(decodedText, true); // true = acumular
                             stopScanner();
                         },
                         (errorMessage) => {
@@ -1253,8 +1255,8 @@
             
             if (e.key === 'Enter') {
                 if (scannerBuffer.length > 3) { // Códigos de barras suelen tener más de 3 caracteres
-                    d.getElementById("search").value = scannerBuffer;
-                    fetchProducts(scannerBuffer, true); // true = acumular
+                    d.getElementById("search-sku").value = scannerBuffer;
+                    searchBySKU(scannerBuffer, true); // true = acumular
                     scannerBuffer = '';
                 }
             } else {
