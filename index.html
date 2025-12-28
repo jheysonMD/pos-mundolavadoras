@@ -634,6 +634,16 @@
                 
                 renderProducts(filteredProducts, acumular);
                 
+                // Mostrar mensaje si no hay productos
+                if (productosCache.length === 0 && !acumular) {
+                    $productos.innerHTML = `
+                        <div style="grid-column: 1/-1; text-align: center; padding: 40px;">
+                            <h3 style="color: #7f8c8d; font-size: 18px;">😕 No se encontraron productos</h3>
+                            <p style="color: #95a5a6; margin-top: 10px;">Intenta con otro término de búsqueda</p>
+                        </div>
+                    `;
+                }
+                
                 // Mostrar botón limpiar
                 const clearBtn = d.getElementById("clear-search-btn");
                 clearBtn.style.display = productosCache.length > 0 ? "block" : "none";
@@ -674,8 +684,8 @@
 
         async function renderProducts(products, acumular = false) {
             const template = d.getElementById("producto-template").content;
-            const fragment = d.createDocumentFragment();
 
+            // Renderizar cada producto inmediatamente y buscar precio de negocio después
             for (const p of products) {
                 // Evitar duplicados si estamos acumulando
                 if (acumular && Array.from($productos.children).find(child => child.dataset.productId === String(p.id))) {
@@ -693,27 +703,36 @@
                 
                 const addBtn = clone.querySelector(".add-to-cart");
                 
-                // Buscar precio de negocio
-                const bizPrice = await getBusinessPrice(p.sku);
+                // Botón por defecto (precio normal)
+                addBtn.onclick = () => addToCart(p, parseFloat(p.price));
                 
-                if (bizPrice && bizPrice < parseFloat(p.price)) {
-                    // Mostrar solo precio de negocio (sin badge naranja)
-                    const bizPriceEl = clone.querySelector(".business-price");
-                    bizPriceEl.textContent = `Negocio: ${formatPrice(bizPrice)}`;
-                    bizPriceEl.style.display = "block";
-                    
-                    // Guardar ambos precios en el producto
-                    p.businessPrice = bizPrice;
-                    
-                    // Cambiar comportamiento del botón
-                    addBtn.onclick = () => showPriceSelector(p);
-                } else {
-                    addBtn.onclick = () => addToCart(p, parseFloat(p.price));
-                }
-
-                fragment.appendChild(clone);
+                // Agregar al DOM INMEDIATAMENTE
+                $productos.appendChild(clone);
+                
+                // Buscar precio de negocio EN SEGUNDO PLANO (no bloquea)
+                getBusinessPrice(p.sku).then(bizPrice => {
+                    if (bizPrice && bizPrice < parseFloat(p.price)) {
+                        // Encontrar la tarjeta ya renderizada
+                        const renderedCard = Array.from($productos.children).find(
+                            child => child.dataset.productId === String(p.id)
+                        );
+                        
+                        if (renderedCard) {
+                            // Actualizar con precio de negocio
+                            const bizPriceEl = renderedCard.querySelector(".business-price");
+                            bizPriceEl.textContent = `Negocio: ${formatPrice(bizPrice)}`;
+                            bizPriceEl.style.display = "block";
+                            
+                            // Guardar ambos precios en el producto
+                            p.businessPrice = bizPrice;
+                            
+                            // Actualizar botón
+                            const btn = renderedCard.querySelector(".add-to-cart");
+                            btn.onclick = () => showPriceSelector(p);
+                        }
+                    }
+                });
             }
-            $productos.appendChild(fragment);
         }
 
         // SELECTOR DE PRECIO
