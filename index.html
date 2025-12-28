@@ -338,21 +338,40 @@
 
         /* Receipt Styles */
         @media print {
-            body * { visibility: hidden; }
-            #receipt, #receipt * { visibility: visible; }
-            #receipt {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 80mm;
-                padding: 5mm;
-                font-family: 'Courier New', monospace;
-                color: black;
+            body * { 
+                visibility: hidden !important;
+                display: none !important;
             }
-            .no-print { display: none; }
+            #receipt, #receipt * { 
+                visibility: visible !important;
+                display: block !important;
+            }
+            #receipt {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 80mm !important;
+                padding: 5mm !important;
+                font-family: 'Courier New', monospace !important;
+                color: black !important;
+                background: white !important;
+            }
+            #receipt table {
+                display: table !important;
+            }
+            #receipt tr {
+                display: table-row !important;
+            }
+            #receipt td, #receipt th {
+                display: table-cell !important;
+            }
         }
         
-        #receipt { display: none; }
+        #receipt { 
+            display: none;
+            background: white;
+            color: black;
+        }
     </style>
 </head>
 <body>
@@ -841,25 +860,33 @@
                 
                 // Si hay productos que existen en ambas tiendas, TAMBIÉN descontar de tienda secundaria
                 if (itemsEnAmbasTiendas.length > 0) {
+                    console.log("🔄 Productos en ambas tiendas:", itemsEnAmbasTiendas);
+                    
                     // Buscar los IDs de los productos en la tienda de negocio por SKU
                     const bizPromises = itemsEnAmbasTiendas.map(async item => {
                         try {
+                            console.log(`🔍 Buscando SKU "${item.sku}" en tienda negocio...`);
                             const api = `${STORE_BIZ.url}?sku=${encodeURIComponent(item.sku)}&consumer_key=${STORE_BIZ.key}&consumer_secret=${STORE_BIZ.secret}`;
                             const res = await fetch(api);
                             const products = await res.json();
+                            console.log(`📦 Productos encontrados para SKU "${item.sku}":`, products);
                             if (products.length > 0) {
+                                console.log(`✅ Producto encontrado - ID: ${products[0].id}, Cantidad: ${item.quantity}`);
                                 return {
                                     product_id: products[0].id,
                                     quantity: item.quantity
                                 };
+                            } else {
+                                console.warn(`⚠️ No se encontró producto con SKU "${item.sku}" en tienda negocio`);
                             }
                         } catch (e) {
-                            console.error("Error buscando producto en tienda negocio:", e);
+                            console.error("❌ Error buscando producto en tienda negocio:", e);
                         }
                         return null;
                     });
                     
                     const bizLineItems = (await Promise.all(bizPromises)).filter(item => item !== null);
+                    console.log("📋 Items para orden de tienda negocio:", bizLineItems);
                     
                     if (bizLineItems.length > 0) {
                         const bizOrder = {
@@ -869,6 +896,7 @@
                             line_items: bizLineItems
                         };
                         
+                        console.log("📝 Creando orden en tienda negocio:", bizOrder);
                         const bizOrderUrl = STORE_BIZ.url.replace('products', 'orders');
                         promises.push(
                             fetch(bizOrderUrl, {
@@ -880,6 +908,8 @@
                                 body: JSON.stringify(bizOrder)
                             })
                         );
+                    } else {
+                        console.warn("⚠️ No hay items para crear orden en tienda negocio");
                     }
                 }
 
