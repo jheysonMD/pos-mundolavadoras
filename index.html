@@ -662,6 +662,44 @@
             }
         }
 
+        // Búsqueda de SKU EXACTO para escáneres (solo trae el producto exacto)
+        async function searchExactSKU(sku, acumular = true) {
+            $loader.style.display = "block";
+            try {
+                // Buscar SOLO por SKU exacto
+                const api = `${STORE_MAIN.url}?sku=${encodeURIComponent(sku)}&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`;
+                const res = await fetch(api);
+                const products = await res.json();
+
+                // Si acumulamos, agregar sin duplicar
+                if (acumular) {
+                    products.forEach(p => {
+                        if (!productosCache.find(cached => cached.id === p.id)) {
+                            productosCache.push(p);
+                        }
+                    });
+                } else {
+                    productosCache = products;
+                }
+                
+                renderProducts(products, acumular);
+                
+                // Mostrar mensaje si no hay productos
+                if (products.length === 0) {
+                    alert(`No se encontró producto con SKU: ${sku}`);
+                }
+                
+                // Mostrar botón limpiar
+                const clearBtn = d.getElementById("clear-search-btn");
+                clearBtn.style.display = productosCache.length > 0 ? "block" : "none";
+            } catch (err) {
+                console.error(err);
+                alert("Error al buscar: " + err.message);
+            } finally {
+                $loader.style.display = "none";
+            }
+        }
+
         // Búsqueda específica por SKU con coincidencias parciales mejorada
         async function searchBySKU(sku, acumular = true) {
             $loader.style.display = "block";
@@ -1182,8 +1220,8 @@
                             statusDiv.innerHTML = '<p style="color: #27ae60; padding: 10px;">✅ Código detectado!</p>';
                             // Usar el campo de SKU para mostrar el código
                             d.getElementById("search-sku").value = decodedText;
-                            // Buscar el producto escaneado
-                            searchBySKU(decodedText, true); // true = acumular
+                            // Buscar SOLO el producto exacto
+                            searchExactSKU(decodedText, true); // Búsqueda exacta
                             stopScanner();
                         },
                         (errorMessage) => {
@@ -1256,7 +1294,7 @@
             if (e.key === 'Enter') {
                 if (scannerBuffer.length > 3) { // Códigos de barras suelen tener más de 3 caracteres
                     d.getElementById("search-sku").value = scannerBuffer;
-                    searchBySKU(scannerBuffer, true); // true = acumular
+                    searchExactSKU(scannerBuffer, true); // Búsqueda exacta para escáner
                     scannerBuffer = '';
                 }
             } else {
