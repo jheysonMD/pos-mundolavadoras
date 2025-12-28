@@ -384,13 +384,17 @@
 
             <section class="search-section">
                 <div class="search-box">
-                    <input type="search" id="search" placeholder="Buscar por nombre o SKU...">
-                    <div class="btn-group">
-                        <button class="btn btn-primary" id="search-btn">🔍 Buscar</button>
-                        <button class="btn scanner-btn" id="toggle-scanner">📷 Escanear</button>
-                    </div>
+                    <input type="text" id="search-sku" placeholder="🔢 Buscar por SKU...">
+                    <button class="btn btn-primary" id="search-sku-btn">Buscar SKU</button>
                 </div>
-                <button class="btn btn-danger" id="clear-search-btn" style="width: 100%; margin-top: 10px; display: none;">🗑️ Limpiar Búsqueda</button>
+                <div class="search-box" style="margin-top: 10px;">
+                    <input type="text" id="search-name" placeholder="📦 Buscar por nombre...">
+                    <button class="btn btn-primary" id="search-name-btn">Buscar Nombre</button>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="btn scanner-btn" id="toggle-scanner" style="flex: 1;">📷 Escanear QR</button>
+                    <button class="btn btn-danger" id="clear-search-btn" style="flex: 1; display: none;">🗑️ Limpiar</button>
+                </div>
                 <div id="qr-reader"></div>
                 <div id="camera-status"></div>
             </section>
@@ -657,10 +661,107 @@
             }
         }
 
+        // Búsqueda específica por SKU
+        async function searchBySKU(sku, acumular = true) {
+            $loader.style.display = "block";
+            if (!acumular) {
+                $productos.innerHTML = "";
+            }
+            try {
+                // Buscar SOLO por SKU
+                const api = `${STORE_MAIN.url}?sku=${encodeURIComponent(sku)}&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`;
+                const res = await fetch(api);
+                const products = await res.json();
+
+                // Si acumulamos, agregar sin duplicar
+                if (acumular) {
+                    products.forEach(p => {
+                        if (!productosCache.find(cached => cached.id === p.id)) {
+                            productosCache.push(p);
+                        }
+                    });
+                } else {
+                    productosCache = products;
+                }
+                
+                renderProducts(products, acumular);
+                
+                // Mostrar mensaje si no hay productos
+                if (products.length === 0) {
+                    if (!acumular || productosCache.length === 0) {
+                        $productos.innerHTML = `
+                            <div style="grid-column: 1/-1; text-align: center; padding: 40px;">
+                                <h3 style="color: #7f8c8d; font-size: 18px;">😕 No se encontró producto con SKU "${sku}"</h3>
+                                <p style="color: #95a5a6; margin-top: 10px;">Verifica el SKU e intenta nuevamente</p>
+                            </div>
+                        `;
+                    }
+                }
+                
+                // Mostrar botón limpiar
+                const clearBtn = d.getElementById("clear-search-btn");
+                clearBtn.style.display = productosCache.length > 0 ? "block" : "none";
+            } catch (err) {
+                console.error(err);
+                alert("Error al buscar por SKU: " + err.message);
+            } finally {
+                $loader.style.display = "none";
+            }
+        }
+
+        // Búsqueda específica por nombre
+        async function searchByName(name, acumular = true) {
+            $loader.style.display = "block";
+            if (!acumular) {
+                $productos.innerHTML = "";
+            }
+            try {
+                // Buscar SOLO por nombre
+                const api = `${STORE_MAIN.url}?search=${encodeURIComponent(name)}&per_page=100&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`;
+                const res = await fetch(api);
+                const products = await res.json();
+
+                // Si acumulamos, agregar sin duplicar
+                if (acumular) {
+                    products.forEach(p => {
+                        if (!productosCache.find(cached => cached.id === p.id)) {
+                            productosCache.push(p);
+                        }
+                    });
+                } else {
+                    productosCache = products;
+                }
+                
+                renderProducts(products, acumular);
+                
+                // Mostrar mensaje si no hay productos
+                if (products.length === 0) {
+                    if (!acumular || productosCache.length === 0) {
+                        $productos.innerHTML = `
+                            <div style="grid-column: 1/-1; text-align: center; padding: 40px;">
+                                <h3 style="color: #7f8c8d; font-size: 18px;">😕 No se encontraron productos con "${name}"</h3>
+                                <p style="color: #95a5a6; margin-top: 10px;">Intenta con otro término</p>
+                            </div>
+                        `;
+                    }
+                }
+                
+                // Mostrar botón limpiar
+                const clearBtn = d.getElementById("clear-search-btn");
+                clearBtn.style.display = productosCache.length > 0 ? "block" : "none";
+            } catch (err) {
+                console.error(err);
+                alert("Error al buscar por nombre: " + err.message);
+            } finally {
+                $loader.style.display = "none";
+            }
+        }
+
         function clearSearch() {
             $productos.innerHTML = "";
             productosCache = [];
-            d.getElementById("search").value = "";
+            d.getElementById("search-sku").value = "";
+            d.getElementById("search-name").value = "";
             d.getElementById("clear-search-btn").style.display = "none";
         }
 
@@ -1094,21 +1195,36 @@
         });
 
         // EVENTOS
-        d.getElementById("search-btn").onclick = () => {
-            const query = d.getElementById("search").value.trim();
-            if (query.length > 0) {
-                fetchProducts(query, false);
+        d.getElementById("search-sku-btn").onclick = () => {
+            const sku = d.getElementById("search-sku").value.trim();
+            if (sku.length > 0) {
+                searchBySKU(sku, true); // true = acumular
             }
         };
-        d.getElementById("search").onkeypress = (e) => { 
+        d.getElementById("search-sku").onkeypress = (e) => { 
             if(e.key === "Enter") {
-                clearTimeout(searchTimeout); // Cancelar el timeout si presiona Enter
-                const query = e.target.value.trim();
-                if (query.length > 0) {
-                    fetchProducts(query, false);
+                const sku = e.target.value.trim();
+                if (sku.length > 0) {
+                    searchBySKU(sku, true);
                 }
             }
         };
+        
+        d.getElementById("search-name-btn").onclick = () => {
+            const name = d.getElementById("search-name").value.trim();
+            if (name.length > 0) {
+                searchByName(name, true); // true = acumular
+            }
+        };
+        d.getElementById("search-name").onkeypress = (e) => { 
+            if(e.key === "Enter") {
+                const name = e.target.value.trim();
+                if (name.length > 0) {
+                    searchByName(name, true);
+                }
+            }
+        };
+        
         d.getElementById("toggle-scanner").onclick = initScanner;
         d.getElementById("clear-search-btn").onclick = clearSearch;
         d.getElementById("checkout-btn").onclick = checkout;
