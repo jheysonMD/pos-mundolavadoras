@@ -1074,21 +1074,6 @@
             }
         });
 
-        // BÚSQUEDA EN TIEMPO REAL
-        d.getElementById("search").oninput = (e) => {
-            clearTimeout(searchTimeout);
-            const query = e.target.value.trim();
-            
-            if (query.length >= 3) {
-                // Esperar 500ms después del último carácter antes de buscar
-                searchTimeout = setTimeout(() => {
-                    fetchProducts(query, false);
-                }, 500);
-            } else if (query.length === 0) {
-                clearSearch();
-            }
-        };
-
         // EVENTOS
         d.getElementById("search-btn").onclick = () => {
             const query = d.getElementById("search").value.trim();
