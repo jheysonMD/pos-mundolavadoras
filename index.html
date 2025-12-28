@@ -661,7 +661,7 @@
             }
         }
 
-        // Búsqueda específica por SKU con coincidencias parciales
+        // Búsqueda específica por SKU con coincidencias parciales mejorada
         async function searchBySKU(sku, acumular = true) {
             $loader.style.display = "block";
             if (!acumular) {
@@ -671,18 +671,24 @@
                 const lowerQuery = sku.toLowerCase();
                 const cleanQuery = sku.replace(/[^a-zA-Z0-9]/g, '');
                 
-                // Buscar por SKU exacto y búsqueda general
+                // Estrategia agresiva: obtener MUCHOS productos para filtrar localmente
                 const promises = [
+                    // SKU exacto
                     fetch(`${STORE_MAIN.url}?sku=${encodeURIComponent(sku)}&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`),
+                    // Búsqueda general amplia
+                    fetch(`${STORE_MAIN.url}?per_page=100&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`),
+                    // Búsqueda por el término
                     fetch(`${STORE_MAIN.url}?search=${encodeURIComponent(sku)}&per_page=100&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`)
                 ];
                 
-                // Si tiene guiones, buscar también sin ellos
-                if (sku.includes('-')) {
-                    const withoutDash = sku.replace(/-/g, '');
-                    promises.push(
-                        fetch(`${STORE_MAIN.url}?search=${encodeURIComponent(withoutDash)}&per_page=50&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`)
-                    );
+                // Buscar por partes del SKU
+                const skuParts = sku.split(/[-]/);
+                for (const part of skuParts) {
+                    if (part.length >= 2) {
+                        promises.push(
+                            fetch(`${STORE_MAIN.url}?search=${encodeURIComponent(part)}&per_page=50&consumer_key=${STORE_MAIN.key}&consumer_secret=${STORE_MAIN.secret}`)
+                        );
+                    }
                 }
                 
                 const responses = await Promise.all(promises);
@@ -701,14 +707,17 @@
                     }
                 }
                 
-                // Filtrar SOLO productos que contengan la búsqueda en el SKU
+                // Filtrar localmente - SOLO productos que contengan la búsqueda en el SKU
                 const skuProducts = uniqueProducts.filter(p => {
                     const productSku = (p.sku || '').toLowerCase();
                     const productSkuClean = productSku.replace(/[^a-z0-9]/g, '');
                     
+                    // Verificar si contiene la búsqueda
                     return productSku.includes(lowerQuery) || 
                            productSku.includes(cleanQuery) ||
-                           productSkuClean.includes(cleanQuery);
+                           productSkuClean.includes(cleanQuery) ||
+                           // Verificar cada parte del SKU
+                           skuParts.some(part => productSku.includes(part.toLowerCase()));
                 });
                 
                 // Ordenar por relevancia
@@ -752,7 +761,7 @@
                         $productos.innerHTML = `
                             <div style="grid-column: 1/-1; text-align: center; padding: 40px;">
                                 <h3 style="color: #7f8c8d; font-size: 18px;">😕 No se encontraron productos con SKU que contengan "${sku}"</h3>
-                                <p style="color: #95a5a6; margin-top: 10px;">Intenta con otro término</p>
+                                <p style="color: #95a5a6; margin-top: 10px;">Intenta con más caracteres del SKU</p>
                             </div>
                         `;
                     }
